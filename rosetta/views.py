@@ -1,3 +1,4 @@
+#coding: utf-8
 from django.conf import settings
 from django.contrib.auth.decorators import user_passes_test
 from django.core.paginator import Paginator
@@ -46,9 +47,11 @@ def home(request):
         return out_
 
     version = rosetta.get_version(True)
+    ref_lang = 'fr'
     if 'rosetta_i18n_fn' in request.session:
         rosetta_i18n_fn = request.session.get('rosetta_i18n_fn')
 
+        # L3i/Socodevi/PerformCoop : la seule option utilisée est "third-party"
         ref_lang = request.session.get('rosetta_i18n_ref_lang_code', 'fr')
         ref_pofile = None
         if ref_lang != 'msgid':
@@ -241,6 +244,8 @@ def home(request):
             del(request.session['rosetta_last_save_error'])
             rosetta_last_save_error = True
 
+        # L3i/Socodevi/PerformCoop : Offrir une liste de langues de référence.
+        # Y'a aussi l'option pour afficher les MSGIDs directement.
         LANGUAGES = [ (langid, _(langname)) for langid,langname in settings.LANGUAGES]
         LANGUAGES.append( ('msgid', 'MSGID') )
 
@@ -295,14 +300,9 @@ def list_languages(request):
     """
     languages = []
 
-    if 'filter' in request.GET:
-        if request.GET.get('filter') in ('project', 'third-party', 'django', 'all'):
-            filter_ = request.GET.get('filter')
-            request.session['rosetta_i18n_catalog_filter'] = filter_
-            return HttpResponseRedirect(reverse('rosetta-pick-file'))
-
-    rosetta_i18n_catalog_filter = request.session.get('rosetta_i18n_catalog_filter', 'project')
-
+    
+    # L3i/Socodevi/PerformCoop : la seule option utilisée est "third-party"
+    rosetta_i18n_catalog_filter = 'project'
     third_party_apps = rosetta_i18n_catalog_filter in ('all', 'third-party')
     django_apps = rosetta_i18n_catalog_filter in ('all', 'django')
     project_apps = rosetta_i18n_catalog_filter in ('all', 'project')
@@ -310,6 +310,10 @@ def list_languages(request):
     has_pos = False
     for language in settings.LANGUAGES:
         pos = find_pos(language[0], project_apps=project_apps, django_apps=django_apps, third_party_apps=third_party_apps)
+
+        # L3i/Socodevi/PerformCoop : on trie les apps par ordre alphabétique 
+        pos.sort()
+
         has_pos = has_pos or len(pos)
         languages.append(
             (language[0],
@@ -326,7 +330,17 @@ list_languages = user_passes_test(lambda user: can_translate(user), settings.LOG
 
 def get_app_name(path):
     app = path.split("/locale")[0].split("/")[-1]
-    return app
+
+    # L3i/Socodevi/PerformCoop : on donne un joli nom à nos 5 apps
+    d = {
+        "performcoop_core" : 'Général',
+        "performcoop_bilanoutils" : 'Bilan Outils',
+        "performcoop_donneesbrutes" : 'Données brutes',
+        
+        #"performcoop_" : 'Sommaires',
+        #"BilanPA" : 'Bilan P&A',
+    }
+    return d.get(app, app)
 
 
 def lang_sel(request, langid, idx):
@@ -337,12 +351,15 @@ def lang_sel(request, langid, idx):
         raise Http404
     else:
 
-        rosetta_i18n_catalog_filter = request.session.get('rosetta_i18n_catalog_filter', 'project')
-
+        rosetta_i18n_catalog_filter = 'project'
         third_party_apps = rosetta_i18n_catalog_filter in ('all', 'third-party')
         django_apps = rosetta_i18n_catalog_filter in ('all', 'django')
         project_apps = rosetta_i18n_catalog_filter in ('all', 'project')
-        file_ = find_pos(langid, project_apps=project_apps, django_apps=django_apps, third_party_apps=third_party_apps)[int(idx)]
+
+        # L3i/Socodevi/PerformCoop : on trie les apps par ordre alphabétique 
+        pos = find_pos(langid, project_apps=project_apps, django_apps=django_apps, third_party_apps=third_party_apps)
+        pos.sort()
+        file_ = pos[int(idx)]
 
         request.session['rosetta_i18n_lang_code'] = langid
         request.session['rosetta_i18n_lang_name'] = unicode([l[1] for l in settings.LANGUAGES if l[0] == langid][0])
@@ -363,6 +380,10 @@ lang_sel = never_cache(lang_sel)
 lang_sel = user_passes_test(lambda user: can_translate(user), settings.LOGIN_URL)(lang_sel)
 
 def ref_sel(request, langid):
+    """
+    L3i/Socodevi/PerformCoop : on trie les apps par ordre alphabétique 
+    """
+
     ALLOWED_LANGUAGES = [l[0] for l in settings.LANGUAGES]
     ALLOWED_LANGUAGES.append('msgid')
 
@@ -386,7 +407,7 @@ def can_translate(user):
     else:
         try:
             from django.contrib.auth.models import Group
-            translators = Group.objects.get(name='translators')
+            translators = Group.objects.get(name='Traducteurs')
             return translators in user.groups.all()
         except Group.DoesNotExist:
             return False
