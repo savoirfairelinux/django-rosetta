@@ -3,11 +3,33 @@ import django
 from django.conf import settings
 from rosetta.conf import settings as rosetta_settings
 from django.core.cache import cache
+from datetime import datetime
+try:
+    from django.utils import timezone
+except:
+    timezone = None
+
 
 try:
     set
 except NameError:
     from sets import Set as set   # Python 2.3 fallback
+
+
+def timestamp_with_timezone(dt=None):
+    """
+    Return a timestamp with a timezone for the configured locale.  If all else
+    fails, consider localtime to be UTC.
+    """
+    dt = dt or datetime.now()
+    if timezone is None:
+        return dt.strftime('%Y-%m-%d %H:%M%z')
+    if not dt.tzinfo:
+        tz = timezone.get_current_timezone()
+        if not tz:
+            tz = timezone.utc
+        dt = dt.replace(tzinfo=timezone.get_current_timezone())
+    return dt.strftime("%Y-%m-%d %H:%M%z")
 
 
 def find_pos(lang, project_apps=True, django_apps=False, third_party_apps=False):
@@ -33,28 +55,24 @@ def find_pos(lang, project_apps=True, django_apps=False, third_party_apps=False)
         django_paths = cache.get('rosetta_django_paths')
         if django_paths is None:
             django_paths = []
-            for root,dirnames,filename in os.walk(os.path.abspath(os.path.dirname(django.__file__))):
+            for root, dirnames, filename in os.walk(os.path.abspath(os.path.dirname(django.__file__))):
                 if 'locale' in dirnames:
-                    django_paths.append(os.path.join(root , 'locale'))
+                    django_paths.append(os.path.join(root, 'locale'))
                     continue
-            cache.set('rosetta_django_paths', django_paths, 60*60)
+            cache.set('rosetta_django_paths', django_paths, 60 * 60)
         paths = paths + django_paths
-        
-    
-    # settings 
+    # settings
     for localepath in settings.LOCALE_PATHS:
         if os.path.isdir(localepath):
             paths.append(localepath)
-    
+
     # project/app/locale
     for appname in settings.INSTALLED_APPS:
-                
         if rosetta_settings.EXCLUDED_APPLICATIONS and appname in rosetta_settings.EXCLUDED_APPLICATIONS:
             continue
-            
         p = appname.rfind('.')
         if p >= 0:
-            app = getattr(__import__(appname[:p], {}, {}, [appname[p+1:]]), appname[p+1:])
+            app = getattr(__import__(appname[:p], {}, {}, [appname[p + 1:]]), appname[p + 1:])
         else:
             app = __import__(appname, {}, {}, [])
 

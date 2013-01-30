@@ -20,9 +20,7 @@ Features
 Requirements
 ************
 
-Rosetta requires Django 1.2 or later. 
-
-Note that Rosetta is known to work with Django 1.1, but it is not supported.
+Rosetta requires Django 1.3 or later
 
 ************
 Installation
@@ -62,6 +60,20 @@ Rosetta can be configured via the following parameters, to be defined in your pr
 * ``ROSETTA_EXCLUDED_APPLICATIONS``: Exclude applications defined in this list from being translated. Defaults to ``()``.
 * ``ROSETTA_REQUIRES_AUTH``: Require authentication for all Rosetta views. Defaults to ``True``.
 * ``ROSETTA_POFILE_WRAP_WIDTH``: Sets the line-length of the edited PO file. Set this to ``0`` to mimic ``makemessage``'s ``--no-wrap`` option. Defaults to ``78``.
+* ``ROSETTA_STORAGE_CLASS``: See the note below on Storages. Defaults to ``rosetta.storage.CacheRosettaStorage``
+* ``ROSETTA_ENABLE_REFLANG``: See the note below on Reference Language. Defaults to ``False``.
+
+********
+Storages
+********
+
+To prevent re-reading and parsing the PO file catalogs over and over again, Rosetta stores them in a volatile location. This can be either the HTTP session or the Django cache. 
+
+Django 1.4 has introduced a signed cookie session backend, which stores the whole content of the session in an encrypted cookie. Unfortunately this doesn't work with large PO files, as the limit of 4096 chars that can be stored in a cookie are easily exceeded. 
+
+In this case the Cache-based backend should be used (by setting ``ROSETTA_STORAGE_CLASS = 'rosetta.storage.CacheRosettaStorage'``). Please make sure that a proper CACHES backend is configured in your Django settings.
+
+Alternatively you can switch back to using the Session based storage by setting ``ROSETTA_STORAGE_CLASS = 'rosetta.storage.SessionRosettaStorage`` in your settings. This is perfectly safe on Django 1.3. On Django 1.4 or higher make sure you have DON'T use the `signed_cookies <https://docs.djangoproject.com/en/dev/topics/http/sessions/#using-cookie-based-sessions>`_ ``SESSION_BACKEND`` with this Rosetta storage backend or funky things might happen.
 
 ********
 Security
@@ -73,6 +85,18 @@ If you wish to grant editing access to other users:
  
 1. Create a 'translators' group in your admin interface
 2. Add the user you wish to grant translating rights to this group
+
+******************
+Reference Language
+******************
+
+If this option is enabled, a selector will appear on the translation page allowing you to choose
+a reference language. A reference language will allow you to display your ``msgid`` in a laguage
+that has already been translated. For example, if you already have a translation in French, a
+translator that only knows French and Spanish (but not English) could select French as a reference
+language to perform a "second hand" translation.
+
+The last row of the reference language selector, "MSGID", is to directly display ``msgid``.
 
 *****
 Usage
