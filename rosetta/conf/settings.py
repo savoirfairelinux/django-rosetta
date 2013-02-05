@@ -53,3 +53,5 @@ POFILE_WRAP_WIDTH = getattr(settings, 'ROSETTA_POFILE_WRAP_WIDTH', 78)
 STORAGE_CLASS = getattr(settings, 'ROSETTA_STORAGE_CLASS', 'rosetta.storage.CacheRosettaStorage')
 
 ENABLE_REFLANG = getattr(settings, 'ROSETTA_ENABLE_REFLANG', False)
+
+CUSTOM_APPNAMES = getattr(settings, 'ROSETTA_CUSTOM_APPNAMES', {})

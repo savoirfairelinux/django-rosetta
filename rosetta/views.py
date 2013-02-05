@@ -358,17 +358,7 @@ list_languages = user_passes_test(lambda user: can_translate(user), settings.LOG
 
 def get_app_name(path):
     app = path.split("/locale")[0].split("/")[-1]
-
-    # L3i/Socodevi/PerformCoop : on donne un joli nom à nos 5 apps
-    d = {
-        "performcoop_core" : 'Général',
-        "performcoop_bilanoutils" : 'Bilan Outils',
-        "performcoop_donneesbrutes" : 'Données brutes',
-        
-        #"performcoop_" : 'Sommaires',
-        #"BilanPA" : 'Bilan P&A',
-    }
-    return d.get(app, app)
+    return rosetta_settings.CUSTOM_APPNAMES.get(app, app)
 
 
 def lang_sel(request, langid, idx):
