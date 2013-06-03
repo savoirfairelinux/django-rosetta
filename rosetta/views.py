@@ -14,6 +14,7 @@ from rosetta.polib import pofile
 from rosetta.poutil import find_pos, pagination_range, timestamp_with_timezone
 from rosetta.signals import entry_changed, post_save
 from rosetta.storage import get_storage
+from rosetta.access import can_translate
 import re
 import rosetta
 import unicodedata
@@ -198,7 +199,6 @@ def home(request):
             else:
                 paginator = Paginator([e for e in rosetta_i18n_pofile if not e.obsolete], rosetta_settings.MESSAGES_PER_PAGE)
 
-        # We put constants in the local namespace so that they're sent to the template context
         if rosetta_settings.ENABLE_REFLANG:
             ref_lang = storage.get('rosetta_i18n_ref_lang_code', 'msgid')
             ref_pofile = None
@@ -219,6 +219,8 @@ def home(request):
                     if ref_entry is not None and ref_entry.msgstr:
                         o.ref_txt = ref_entry.msgstr
             LANGUAGES = list(settings.LANGUAGES) + [('msgid', 'MSGID')]
+        else:
+            LANGUAGES = settings.LANGUAGES
 
         if 'page' in request.GET and int(request.GET.get('page')) <= paginator.num_pages and int(request.GET.get('page')) > 0:
             page = int(request.GET.get('page'))
@@ -270,6 +272,7 @@ def home(request):
             ADMIN_MEDIA_PREFIX=ADMIN_MEDIA_PREFIX,
             ADMIN_IMAGE_DIR=ADMIN_IMAGE_DIR,
             ENABLE_REFLANG=rosetta_settings.ENABLE_REFLANG,
+            LANGUAGES=LANGUAGES,
             rosetta_settings=rosetta_settings,
             rosetta_i18n_lang_name=_(storage.get('rosetta_i18n_lang_name')),
             rosetta_i18n_lang_code=rosetta_i18n_lang_code,
@@ -403,11 +406,7 @@ def lang_sel(request, langid, idx):
         third_party_apps = rosetta_i18n_catalog_filter in ('all', 'third-party')
         django_apps = rosetta_i18n_catalog_filter in ('all', 'django')
         project_apps = rosetta_i18n_catalog_filter in ('all', 'project')
-
-        # L3i/Socodevi/PerformCoop : on trie les apps par ordre alphabétique 
-        pos = find_pos(langid, project_apps=project_apps, django_apps=django_apps, third_party_apps=third_party_apps)
-        pos.sort()
-        file_ = pos[int(idx)]
+        file_ = sorted(find_pos(langid, project_apps=project_apps, django_apps=django_apps, third_party_apps=third_party_apps), key=get_app_name)[int(idx)]
 
         storage.set('rosetta_i18n_lang_code', langid)
         storage.set('rosetta_i18n_lang_name', six.text_type([l[1] for l in settings.LANGUAGES if l[0] == langid][0]))
@@ -441,20 +440,3 @@ def ref_sel(request, langid):
     return HttpResponseRedirect(reverse('rosetta-home'))
 ref_sel = never_cache(ref_sel)
 ref_sel = user_passes_test(lambda user: can_translate(user), settings.LOGIN_URL)(ref_sel)
-
-
-def can_translate(user):
-    if not getattr(settings, 'ROSETTA_REQUIRES_AUTH', True):
-        return True
-    if not user.is_authenticated():
-        return False
-    elif user.is_superuser and user.is_staff:
-        return True
-    else:
-        try:
-            from django.contrib.auth.models import Group
-            translators = Group.objects.get(name='Traducteurs')
-            return translators in user.groups.all()
-        except Group.DoesNotExist:
-            return False
-

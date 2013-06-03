@@ -537,3 +537,37 @@ class RosettaTestCase(TestCase):
         r = self.client.post(reverse('rosetta-home'), dict(m_e48f149a8b2e8baa81b816c0edf93890='Hello, world', _next='_next'))
         r = self.client.get(reverse('rosetta-home'))
         self.assertTrue('Progress: 25.00%' in str(r.content))
+
+    def test_24_replace_access_control(self):
+        # Test default access control allows access
+        url = reverse('rosetta-home')
+        response = self.client.get(url)
+        self.assertEqual(200, response.status_code)
+
+        # Now replace access control, and check we get redirected
+        settings.ROSETTA_ACCESS_CONTROL_FUNCTION = 'rosetta.tests.no_access'
+        response = self.client.get(url)
+        self.assertEqual(302, response.status_code)
+
+        # Restore setting to default
+        settings.ROSETTA_ACCESS_CONTROL_FUNCTION = None
+
+    def test_25_reflang(self):
+        rosetta_settings.ENABLE_REFLANG = True
+        shutil.copy(os.path.normpath(os.path.join(self.curdir, './django.po.issue60.template')), self.dest_file)
+        self.client.get(reverse('rosetta-pick-file') + '?filter=third-party')
+        r = self.client.get(reverse('rosetta-language-selection', args=('xx', 0), kwargs=dict()))
+        r = self.client.get(reverse('rosetta-home'))
+
+        # Verify that there's an option to select a reflang
+        self.assertTrue('<option value="/rosetta/select-ref/xx/">dummy language</option>' in str(r.content))
+
+        r = self.client.get('/rosetta/select-ref/xx/')
+        r = self.client.get(reverse('rosetta-home'))
+        # The translated string in the test PO file ends up in the "Reference" column
+        self.assertTrue('<span class="message">translated-string1</span>' in str(r.content))
+
+
+# Stubbed access control function
+def no_access(user):
+    return False
