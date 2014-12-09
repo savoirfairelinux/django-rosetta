@@ -26,7 +26,12 @@ CACHES = {
         'KEY_PREFIX': 'ROSETTA_TEST'
     }
 }
-
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.filebased.FileBasedCache',
+        'LOCATION': '/tmp/django_cache',
+    }
+}
 
 #CACHES = {'default': {'BACKEND': 'django.core.cache.backends.dummy.DummyCache'}}
 
@@ -46,11 +51,23 @@ INSTALLED_APPS = [
 ]
 LANGUAGE_CODE = "en"
 
+MIDDLEWARE_CLASSES = (
+    'django.middleware.common.CommonMiddleware',
+    'django.contrib.sessions.middleware.SessionMiddleware',
+    'django.middleware.csrf.CsrfViewMiddleware',
+    'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'django.contrib.messages.middleware.MessageMiddleware'
+)
+
 LANGUAGES = (
-    ('en', 'English'),
     ('ja', u'日本語'),
     ('xx', u'XXXXX'),
+    ('fr', u'French'),
+    ('fr_FR.utf8', u'French (France), UTF8'),
 )
+LOCALE_PATHS = [
+    os.path.join(PROJECT_PATH, 'locale'),
+]
 
 SOUTH_TESTS_MIGRATE = False
 

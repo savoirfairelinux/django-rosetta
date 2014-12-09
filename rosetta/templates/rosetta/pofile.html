@@ -1,4 +1,4 @@
-{% extends "rosetta/base.html" %}
+{% extends "rosetta/base.html" %}{% load admin_static %}
 {% load rosetta i18n %}
 {% load url from future %}
 
@@ -66,6 +66,14 @@
         </form>
         {% endif %}
         {% endcomment %}
+            <form id="changelist-search" action="" method="post">
+                <div>
+                    {% rosetta_csrf_token %}
+                    <label for="searchbar"><img src="{% static "admin/img/icon_searchbox.png" %}" alt="{% trans "Search" %}" /></label>
+                    <input type="text" size="40" name="query" value="{% if query %}{{query}}{% endif %}" id="searchbar" tabindex="0" />
+                    <input type="submit" name="search" value="{% trans "Go" %}" />
+                </div>
+            </form>
         </div>
 
         <form method="post" action="">

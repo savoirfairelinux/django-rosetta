@@ -9,12 +9,17 @@ from django.template import RequestContext
 from django.utils.encoding import iri_to_uri
 from django.utils.translation import ugettext_lazy as _
 from django.views.decorators.cache import never_cache
+
+from microsofttranslator import Translator, TranslateApiException
+
 from rosetta.conf import settings as rosetta_settings
-from rosetta.polib import pofile
+from polib import pofile
 from rosetta.poutil import find_pos, pagination_range, timestamp_with_timezone
 from rosetta.signals import entry_changed, post_save
 from rosetta.storage import get_storage
-from rosetta.access import can_translate
+from rosetta.access import can_translate, can_translate_language
+
+import json
 import re
 import rosetta
 import unicodedata
@@ -94,6 +99,10 @@ def home(request):
                     # so we need unicode here.
                     plural_id = six.text_type(rx_plural.match(key).groups()[1])
 
+                    # Above no longer true as of Polib 1.0.4
+                    if plural_id and plural_id.isdigit():
+                        plural_id = int(plural_id)
+
                 elif rx.match(key):
                     md5hash = str(rx.match(key).groups()[0])
 
@@ -134,12 +143,11 @@ def home(request):
 
             if file_change and rosetta_i18n_write:
                 try:
-                    # Provide defaults in case authorization is not required.
-                    request.user.first_name = getattr(request.user, 'first_name', 'Anonymous')
-                    request.user.last_name = getattr(request.user, 'last_name', 'User')
-                    request.user.email = getattr(request.user, 'email', 'anonymous@user.tld')
-
-                    rosetta_i18n_pofile.metadata['Last-Translator'] = unicodedata.normalize('NFKD', u"%s %s <%s>" % (request.user.first_name, request.user.last_name, request.user.email)).encode('ascii', 'ignore')
+                    rosetta_i18n_pofile.metadata['Last-Translator'] = unicodedata.normalize('NFKD', u"%s %s <%s>" % (
+                        getattr(request.user, 'first_name', 'Anonymous'),
+                        getattr(request.user, 'last_name', 'User'),
+                        getattr(request.user, 'email', 'anonymous@user.tld')
+                    )).encode('ascii', 'ignore')
                     rosetta_i18n_pofile.metadata['X-Translated-Using'] = u"django-rosetta %s" % rosetta.get_version(False)
                     rosetta_i18n_pofile.metadata['PO-Revision-Date'] = timestamp_with_timezone()
                 except UnicodeDecodeError:
@@ -153,7 +161,7 @@ def home(request):
 
                     post_save.send(sender=None, language_code=rosetta_i18n_lang_code, request=request)
                     # Try auto-reloading via the WSGI daemon mode reload mechanism
-                    if  rosetta_settings.WSGI_AUTO_RELOAD and \
+                    if rosetta_settings.WSGI_AUTO_RELOAD and \
                         'mod_wsgi.process_group' in request.environ and \
                         request.environ.get('mod_wsgi.process_group', None) and \
                         'SCRIPT_FILENAME' in request.environ and \
@@ -359,16 +367,19 @@ def list_languages(request, do_session_warn=False):
 
     has_pos = False
     for language in settings.LANGUAGES:
+        if not can_translate_language(request.user, language[0]):
+            continue
+
         pos = find_pos(language[0], project_apps=project_apps, django_apps=django_apps, third_party_apps=third_party_apps)
 
-        # L3i/Socodevi/PerformCoop : on trie les apps par ordre alphabétique 
+        # L3i/Socodevi/PerformCoop : on trie les apps par ordre alphabétique
         pos.sort()
 
         has_pos = has_pos or len(pos)
         languages.append(
             (language[0],
             _(language[1]),
-            sorted([(get_app_name(l), os.path.realpath(l), pofile(l)) for l in  pos], key=lambda app: app[0]),
+            sorted([(get_app_name(l), os.path.realpath(l), pofile(l)) for l in pos], key=lambda app: app[0]),
             )
         )
     try:
@@ -382,7 +393,8 @@ def list_languages(request, do_session_warn=False):
         ADMIN_MEDIA_PREFIX=ADMIN_MEDIA_PREFIX,
         do_session_warn=do_session_warn,
         languages=languages,
-        has_pos=has_pos
+        has_pos=has_pos,
+        rosetta_i18n_catalog_filter=rosetta_i18n_catalog_filter
     ), context_instance=RequestContext(request))
 
 
@@ -398,7 +410,7 @@ def lang_sel(request, langid, idx):
     Selects a file to be translated
     """
     storage = get_storage(request)
-    if langid not in [l[0] for l in settings.LANGUAGES]:
+    if langid not in [l[0] for l in settings.LANGUAGES] or not can_translate_language(request.user, langid):
         raise Http404
     else:
 
@@ -412,7 +424,7 @@ def lang_sel(request, langid, idx):
 
         storage.set('rosetta_i18n_lang_code', langid)
         storage.set('rosetta_i18n_lang_name', six.text_type([l[1] for l in settings.LANGUAGES if l[0] == langid][0]))
-        storage.set('rosetta_i18n_fn',  file_)
+        storage.set('rosetta_i18n_fn', file_)
         po = pofile(file_)
         for entry in po:
             entry.md5hash = hashlib.new('md5',
@@ -442,3 +454,27 @@ def ref_sel(request, langid):
     return HttpResponseRedirect(reverse('rosetta-home'))
 ref_sel = never_cache(ref_sel)
 ref_sel = user_passes_test(lambda user: can_translate(user), settings.LOGIN_URL)(ref_sel)
+
+@user_passes_test(lambda user: can_translate(user), settings.LOGIN_URL)
+def translate_text(request):
+    language_from = request.GET.get('from', None)
+    language_to = request.GET.get('to', None)
+    text = request.GET.get('text', None)
+
+    if language_from == language_to:
+        data = {'success': True, 'translation': text}
+    else:
+        # run the translation:
+        AZURE_CLIENT_ID = getattr(settings, 'AZURE_CLIENT_ID', None)
+        AZURE_CLIENT_SECRET = getattr(settings, 'AZURE_CLIENT_SECRET', None)
+
+        translator = Translator(AZURE_CLIENT_ID, AZURE_CLIENT_SECRET)
+
+        try:
+            translated_text = translator.translate(text, language_to)
+            data = {'success': True, 'translation': translated_text}
+        except TranslateApiException as e:
+            data = {'success': False, 'error': "Translation API Exception: {0}".format(e.message)}
+
+    return HttpResponse(json.dumps(data), content_type='application/json')
+
