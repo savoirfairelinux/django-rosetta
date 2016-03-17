@@ -359,7 +359,7 @@ def list_languages(request, do_session_warn=False):
 
     # rosetta_i18n_catalog_filter = storage.get('rosetta_i18n_catalog_filter', 'project')
     # L3i/Socodevi/PerformCoop : la seule option utilisée est "third-party"
-    rosetta_i18n_catalog_filter = 'project'
+    rosetta_i18n_catalog_filter = 'third-party'
 
     third_party_apps = rosetta_i18n_catalog_filter in ('all', 'third-party')
     django_apps = rosetta_i18n_catalog_filter in ('all', 'django')
@@ -415,7 +415,7 @@ def lang_sel(request, langid, idx):
     else:
 
         # rosetta_i18n_catalog_filter = storage.get('rosetta_i18n_catalog_filter', 'project')
-        rosetta_i18n_catalog_filter = 'project'
+        rosetta_i18n_catalog_filter = 'third-party'
 
         third_party_apps = rosetta_i18n_catalog_filter in ('all', 'third-party')
         django_apps = rosetta_i18n_catalog_filter in ('all', 'django')
