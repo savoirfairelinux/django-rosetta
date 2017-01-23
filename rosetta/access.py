@@ -35,6 +35,13 @@ def is_superuser_staff_or_in_translators_group(user):
         elif user.is_superuser and user.is_staff:
             return True
         else:
+            try:
+                from django.contrib.auth.models import Group
+                # SFL custom: translators --> Traducteurs
+                translators = Group.objects.get(name='Traducteurs')
+                return translators in user.groups.all()
+            except Group.DoesNotExist:
+                return False
             return user.groups.filter(name='translators').exists()
     except AttributeError:
         if not hasattr(user, 'is_authenticated') or not hasattr(user, 'is_superuser') or not hasattr(user, 'groups'):
