@@ -91,10 +91,9 @@
 
                                 {% if message.msgctxt %}
                                     <span class="context">{% trans "Context hint" %}: {{message.msgctxt|safe}}</span>
-                                {% else %}
-                                    {% if message.comment %}
-                                    <span class="context">{% trans "Context hint" %}: {{message.comment|safe}}</span>
-                                    {% endif %}
+                                {% endif %}
+                                {% if message.comment %}
+                                    <span class="context">{% trans "Translator comment" %}: {{message.comment|safe}}</span>
                                 {% endif %}
 
                             </td>
@@ -113,10 +112,9 @@
                                 {% endif %}
                             {% if message.msgctxt %}
                                 <span class="context">{% trans "Context hint" %}: "{{message.msgctxt|safe}}"</span>
-                                {% else %}
-                                {% if message.comment %}
-                                <span class="context">{% trans "Context hint" %}: {{message.comment|safe}}</span>
-                                {% endif %}
+                            {% endif %}
+                            {% if message.comment %}
+                                <span class="context">{% trans "Translator comment" %}: {{message.comment|safe}}</span>
                             {% endif %}
                             </td>
                             {% if main_language %}<td class="original">{{ message.main_lang|format_message|linebreaksbr }}</td>{% endif %}

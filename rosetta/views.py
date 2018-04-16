@@ -39,7 +39,8 @@ from rosetta.storage import get_storage
 
 
 def get_app_name(path):
-    return path.split('/locale')[0].split('/')[-1]
+    app = path.split('/locale')[0].split('/')[-1]
+    return rosetta_settings.CUSTOM_APPNAMES.get(app, app)
 
 
 class RosettaBaseMixin(object):
